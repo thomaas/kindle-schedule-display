@@ -18,8 +18,8 @@ except ImportError:
 # Geographic location
 #
 
-latitude = 39.3286
-longitude = -76.6169
+latitude = 48.2946
+longitude = 10.1055
 
 
 

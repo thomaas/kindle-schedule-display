@@ -1,2 +1,40 @@
 From:
 http://www.mpetroff.net/archives/2012/09/14/kindle-weather-display/
+
+
+Stundenplan (Schulmanager Online)
+---------------------------------
+
+server/schedule-script.py holt den Stundenplan des Tages aus Schulmanager
+Online (Vertretungen fett, Ausfall durchgestrichen) und erzeugt ein Bild im
+Querformat (800x600, für eips auf 600x800 gedreht). Ab switch_time
+(Standard 15:00) und am Wochenende wird der nächste Schultag angezeigt.
+
+Im Kopf steht das Wetter für den angezeigten Tag (Open-Meteo, ohne API-Key):
+Symbol, Tiefst-/Höchsttemperatur und die höchste Regenwahrscheinlichkeit
+zwischen 1 h vor der ersten und 1 h nach der letzten Stunde. Ab
+rain_threshold (Standard 40 %) erscheint zusätzlich "Regenjacke!". Ort und
+Schwelle stehen im Abschnitt [weather] der schedule-config.ini; mit
+--no-weather wird das Wetter weggelassen. Schlägt der Abruf fehl, wird der
+Stundenplan ohne Wetter angezeigt.
+
+Raspberry Pi:
+  sudo apt install python3-requests librsvg2-bin imagemagick
+  cp server/schedule-config.ini.example server/schedule-config.ini   # Zugangsdaten eintragen
+  python3 server/schedule-script.py --dump-json                       # Test, gibt Rohdaten aus
+  # Zielpfad und Drehrichtung (ROTATE) in server/schedule-script.sh anpassen
+  crontab -e:
+    # 0,30 6-20 * * 1-5,7 sh /home/pi/kindle-weather-display/server/schedule-script.sh
+
+
+Kindle (stromsparend, schläft zwischen den Updates):
+  mkdir /mnt/us/schedule
+  kindle/schedule-loop.sh, kindle/init-schedule.sh und
+  kindle/weather-image-error.png nach /mnt/us/schedule kopieren,
+  IMAGE_URL/STAY_URL in schedule-loop.sh anpassen, dann
+  /mnt/us/schedule/init-schedule.sh starten.
+
+  Wartungsmodus: Datei STAY_AWAKE auf dem Pi (neben dem Bild) oder unter
+  /mnt/us/schedule/STAY_AWAKE anlegen. Beim nächsten Aufwachen bleibt der
+  Kindle mit WLAN wach und per SSH erreichbar. Zum Fortsetzen Datei löschen
+  und init-schedule.sh erneut starten. Log: /mnt/us/schedule/schedule.log

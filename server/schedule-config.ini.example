@@ -1,0 +1,16 @@
+# Copy to schedule-config.ini and fill in your Schulmanager credentials.
+# Alternatively set the environment variables SM_EMAIL and SM_PASSWORD.
+
+[schulmanager]
+email = name@example.com
+password = secret
+
+# From this time on, the next school day is shown instead of today
+switch_time = 15:00
+
+[weather]
+# Location for the forecast (Open-Meteo)
+latitude = 48.2946
+longitude = 10.1055
+# From this rain probability (%) on, "Regenjacke!" is shown
+rain_threshold = 40
