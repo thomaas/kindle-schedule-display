@@ -10,7 +10,7 @@ switch_time = 15:00
 
 [weather]
 # Location for the forecast (Open-Meteo)
-latitude = 48.2946
-longitude = 10.1055
+latitude = 48.1614
+longitude = 11.5039
 # From this rain probability (%) on, "Regenjacke!" is shown
 rain_threshold = 40
