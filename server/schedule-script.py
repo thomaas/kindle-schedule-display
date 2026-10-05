@@ -10,6 +10,7 @@
 #   python3 schedule-script.py --from-json f   # render from saved API data
 #   python3 schedule-script.py --date 2026-10-05
 #   python3 schedule-script.py --no-weather    # skip the weather forecast
+#   python3 schedule-script.py --fish-name     # only print a fish name for fishdraw
 
 import argparse
 import codecs
@@ -243,6 +244,66 @@ def render_weather(weather, rain_threshold):
 
 
 
+
+#
+# Fish name for fishdraw (made from the cancelled lessons)
+#
+
+# Subject -> latin-sounding adjective (matched as prefix of the lowercased subject)
+FISH_WORDS = [
+    ('mathe', 'mathematicus'), ('deutsch', 'germanicus'), ('englisch', 'anglicus'),
+    ('franz', 'gallicus'), ('latein', 'latinus'), ('griech', 'graecus'),
+    ('spanisch', 'hispanicus'), ('italien', 'italicus'), ('musik', 'musicus'),
+    ('sport', 'athleticus'), ('bio', 'biologicus'), ('chemie', 'chemicus'),
+    ('physik', 'physicus'), ('geschichte', 'historicus'), ('erdkunde', 'geographicus'),
+    ('geo', 'geographicus'), ('kunst', 'artisticus'), ('ev', 'religiosus'),
+    ('kath', 'religiosus'), ('relig', 'religiosus'), ('ethik', 'ethicus'),
+    ('informatik', 'informaticus'), ('sozial', 'politicus'), ('politik', 'politicus'),
+    ('wirtschaft', 'oeconomicus'), ('natur', 'technicus'), ('philo', 'philosophicus'),
+    ('psycho', 'psychologicus'), ('theater', 'theatricus'),
+]
+
+
+def latinize(subject):
+    # Fallback for unknown subjects: "Astronomie" -> "astronomicus"
+    word = subject.lower()
+    for umlaut, replacement in (('ä', 'ae'), ('ö', 'oe'), ('ü', 'ue'), ('ß', 'ss')):
+        word = word.replace(umlaut, replacement)
+    word = re.sub(r'[^a-z]', '', word.split()[0] if word.split() else '')
+    if not word:
+        return ''
+    if word.endswith('ik'):
+        return word[:-2] + 'icus'
+    if word.endswith('ie'):
+        return word[:-2] + 'icus'
+    if word.endswith('en'):
+        word = word[:-2]
+    if word[-1] in 'aeiou':
+        word = word[:-1]
+    return word + 'us'
+
+
+def fish_word(subject):
+    lower = subject.lower().strip()
+    for prefix, word in FISH_WORDS:
+        if lower.startswith(prefix):
+            return word
+    return latinize(subject)
+
+
+def fish_name(rows):
+    # "Nonmathematicus musicus biologicus" - at most three names, empty without cancellations
+    words = []
+    for row in rows:
+        word = fish_word(row['subject']) if row['cancelled'] else ''
+        if word and word not in words:
+            words.append(word)
+    if not words:
+        return ''
+    words = words[:3]
+    return 'Non' + words[0] + ''.join(' ' + word for word in words[1:])
+
+
 #
 # Pick the day to display
 #
@@ -329,6 +390,7 @@ def main():
     parser.add_argument('--from-json', help='render from saved API data instead of fetching')
     parser.add_argument('--date', help='day to display (YYYY-MM-DD)')
     parser.add_argument('--no-weather', action='store_true', help='skip the weather forecast')
+    parser.add_argument('--fish-name', action='store_true', help='only print a fish name from the cancelled lessons')
     args = parser.parse_args()
 
     config = load_config()
@@ -355,6 +417,10 @@ def main():
     except Exception as e:
         print('Fehler: %s' % e, file=sys.stderr)
         body = render_error(str(e))
+
+    if args.fish_name:
+        print(fish_name(rows))
+        return
 
     # The weather is optional: without it the schedule is still shown
     weather_svg = ''

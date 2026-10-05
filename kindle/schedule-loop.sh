@@ -17,12 +17,9 @@ STAY_URL=http://192.168.40.191/STAY_AWAKE
 # Local time zone (POSIX format, Germany)
 export TZ=CET-1CEST,M3.5.0,M10.5.0/3
 
-# School days (1=Mon .. 7=Sun), active hours and update interval
-SCHOOL_DAYS="1 2 3 4 5 7"
-DAY_START=6          # first update at DAY_START:WAKE_MINUTE
-DAY_END=20           # no further updates from this hour on
-INTERVAL=1800        # seconds between updates during active hours
-WAKE_MINUTE=5        # a few minutes after the Pi cron job
+# Update times (HH:MM, ascending), a few minutes after the Pi cron jobs
+WEEKDAY_TIMES="06:05 06:35 07:05 08:05 15:05 17:05"
+WEEKEND_TIMES="08:05 15:05"
 
 SUSPEND=1            # 1 = suspend to RAM between updates, 0 = plain sleep (WiFi still off)
 WIFI_TIMEOUT=45      # seconds to wait for a WiFi connection
@@ -78,11 +75,20 @@ enter_maintenance() {
 	exit 0
 }
 
-is_school_day() {
-	for d in $SCHOOL_DAYS; do
-		[ "$d" = "$1" ] && return 0
-	done
-	return 1
+# Update times for a weekday (1=Mon .. 7=Sun)
+times_for_day() {
+	if [ "$1" -ge 6 ]; then
+		echo "$WEEKEND_TIMES"
+	else
+		echo "$WEEKDAY_TIMES"
+	fi
+}
+
+# HH:MM -> seconds since midnight (strip leading zeros, ash reads 08 as octal)
+to_seconds() {
+	th=${1%:*}; th=${th#0}
+	tm=${1#*:}; tm=${tm#0}
+	echo $((th * 3600 + tm * 60))
 }
 
 # Seconds until the next update
@@ -92,27 +98,20 @@ seconds_to_next_update() {
 	m=$(date +%M); m=${m#0}
 	s=$(date +%S); s=${s#0}
 	now=$((h * 3600 + m * 60 + s))
-	first=$((DAY_START * 3600 + WAKE_MINUTE * 60))
 
-	if is_school_day "$dow"; then
-		if [ $now -lt $first ]; then
-			echo $((first - now))
+	# Next slot today; the 60 s margin skips the slot we just woke up for
+	# in case the RTC fired slightly early
+	for t in $(times_for_day "$dow"); do
+		ts=$(to_seconds "$t")
+		if [ $ts -gt $((now + 60)) ]; then
+			echo $((ts - now))
 			return
 		fi
-		if [ $((now + INTERVAL)) -lt $((DAY_END * 3600)) ]; then
-			echo $INTERVAL
-			return
-		fi
-	fi
-
-	# Sleep until the first update of the next school day
-	days=1
-	next=$(( dow % 7 + 1 ))
-	while ! is_school_day "$next" && [ $days -lt 7 ]; do
-		days=$((days + 1))
-		next=$(( next % 7 + 1 ))
 	done
-	echo $((days * 86400 - now + first))
+
+	# Otherwise the first slot of tomorrow
+	set -- $(times_for_day $(( dow % 7 + 1 )))
+	echo $((86400 - now + $(to_seconds "$1")))
 }
 
 # Full refresh: clear first (flash) and let it finish, then draw the image
