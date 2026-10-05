@@ -19,14 +19,16 @@ export TZ=CET-1CEST,M3.5.0,M10.5.0/3
 
 # School days (1=Mon .. 7=Sun), active hours and update interval
 SCHOOL_DAYS="1 2 3 4 5 7"
-DAY_START=0          # first update at DAY_START:WAKE_MINUTE
-DAY_END=24           # no further updates from this hour on
+DAY_START=6          # first update at DAY_START:WAKE_MINUTE
+DAY_END=20           # no further updates from this hour on
 INTERVAL=1800        # seconds between updates during active hours
 WAKE_MINUTE=5        # a few minutes after the Pi cron job
 
-SUSPEND=0            # 1 = suspend to RAM between updates, 0 = plain sleep (WiFi still off)
+SUSPEND=1            # 1 = suspend to RAM between updates, 0 = plain sleep (WiFi still off)
 WIFI_TIMEOUT=45      # seconds to wait for a WiFi connection
 MAX_FAILURES=3       # show error image after this many failed fetches in a row
+LOW_BATTERY=20       # show a charging hint below this battery level (percent)
+EINK_SETTLE=5        # seconds to let the e-ink refresh finish before suspending
 
 LOG=$DIR/schedule.log
 LAST=$DIR/last.png
@@ -113,6 +115,13 @@ seconds_to_next_update() {
 	echo $((days * 86400 - now + first))
 }
 
+# Full refresh: clear first (flash) and let it finish, then draw the image
+show_image() {
+	eips -c
+	sleep 1
+	eips -g "$1"
+}
+
 update_display() {
 	rm -f "$NEW"
 	if wget -q -O "$NEW" "$IMAGE_URL" && [ -s "$NEW" ]; then
@@ -120,8 +129,7 @@ update_display() {
 		if [ -e "$LAST" ] && cmp -s "$NEW" "$LAST"; then
 			log "image unchanged"
 		else
-			eips -c
-			eips -g "$NEW"
+			show_image "$NEW"
 			mv "$NEW" "$LAST"
 			log "image updated"
 		fi
@@ -129,11 +137,27 @@ update_display() {
 		failures=$((failures + 1))
 		log "fetch failed ($failures)"
 		if [ $failures -ge $MAX_FAILURES ]; then
-			eips -c
-			eips -g "$DIR/weather-image-error.png"
+			show_image "$DIR/weather-image-error.png"
 			# Force a redraw once the server is reachable again
 			rm -f "$LAST"
 		fi
+	fi
+}
+
+# Overlay a charging hint at the bottom right when the battery is low
+show_battery_warning() {
+	batt=$(lipc-get-prop com.lab126.powerd battLevel 2>/dev/null)
+	charging=$(lipc-get-prop com.lab126.powerd isCharging 2>/dev/null)
+	[ -z "$batt" ] && return
+	if [ "$batt" -lt $LOW_BATTERY ] && [ "$charging" != "1" ]; then
+		msg="Akku ${batt}% - bitte laden"
+		eips $((50 - ${#msg})) 39 "$msg"
+		battery_warning=1
+		log "low battery: $batt%"
+	elif [ "$battery_warning" = "1" ]; then
+		# Remove the hint again by redrawing the current image
+		[ -e "$LAST" ] && show_image "$LAST"
+		battery_warning=0
 	fi
 }
 
@@ -158,6 +182,10 @@ suspend_for() {
 	fi
 	echo 0 > "$rtc/wakealarm"
 	echo $(( $(cat "$rtc/since_epoch") + $1 )) > "$rtc/wakealarm"
+	# eips returns before the panel has finished its refresh; suspending
+	# too early leaves a faint, half-drawn image
+	sync
+	sleep "$EINK_SETTLE"
 	log "suspending for $1 s"
 	echo mem > /sys/power/state
 	# Execution continues here after wake-up
@@ -165,7 +193,10 @@ suspend_for() {
 }
 
 failures=0
+battery_warning=0
 log "loop started"
+# Always draw on the first cycle, even if the image has not changed
+rm -f "$LAST"
 
 while true; do
 	if wifi_on; then
@@ -177,6 +208,7 @@ while true; do
 		[ -e "$DIR/STAY_AWAKE" ] && enter_maintenance
 	fi
 
+	show_battery_warning
 	wifi_off
 	suspend_for "$(seconds_to_next_update)"
 done
