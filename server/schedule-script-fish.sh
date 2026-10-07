@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# 0,30 6-20 * * 1-5,7 sh /home/pi/fishdraw/schedule-script-fish.sh
+# 50 7 * * *  sh /home/pi/fishdraw/schedule-script-fish.sh
 
 # Rotation for landscape display: use 90 or -90 depending on how the Kindle is placed
 ROTATE=90
