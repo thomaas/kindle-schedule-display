@@ -11,6 +11,9 @@
 #   python3 schedule-script.py --date 2026-10-05
 #   python3 schedule-script.py --no-weather    # skip the weather forecast
 #   python3 schedule-script.py --fish-name     # only print a fish name for fishdraw
+#
+# Exit code 3 means there are no lessons at all (holidays), schedule-script.sh
+# then shows a random fish instead.
 
 import argparse
 import codecs
@@ -32,6 +35,8 @@ FALLBACK_BUNDLE_VERSION = '3505280ee7'
 DAYS_OF_WEEK = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+EXIT_NO_LESSONS = 3
 
 
 
@@ -154,7 +159,15 @@ def normalize(raw_lessons, day):
         lesson_type = lesson.get('type', '')
         cancelled = bool(lesson.get('isCancelled')) or lesson_type == 'cancelledLesson'
         originals = lesson.get('originalLessons') or []
-        if cancelled and originals:
+        if lesson_type == 'event':
+            # Events (e.g. "Wandertag Attenhofen") replace the lessons of that hour
+            event = lesson.get('event') or {}
+            details = {
+                'subject': event.get('text', ''),
+                'teacher': ', '.join(t.get('abbreviation') or t.get('lastname', '') for t in event.get('teachers') or []),
+                'room': ', '.join(r.get('name', '') for r in event.get('rooms') or []),
+            }
+        elif cancelled and originals:
             details = lesson_details(originals[0])
         else:
             details = lesson_details(lesson.get('actualLesson') or {})
@@ -165,6 +178,7 @@ def normalize(raw_lessons, day):
             'until': short_time(class_hour.get('until')),
             'cancelled': cancelled,
             'substitution': lesson_type == 'substitution',
+            'event': lesson_type == 'event',
         })
         rows.append(details)
 
@@ -292,16 +306,18 @@ def fish_word(subject):
 
 
 def fish_name(rows):
-    # "Nonmathematicus musicus biologicus" - at most three names, empty without cancellations
+    # "Nonmathematicus musicus biologicus" - at most three names from the day's
+    # lessons, cancelled ones first and with the prefix "non". Empty without
+    # lessons (holidays), fishdraw then picks a random fish.
     words = []
-    for row in rows:
-        word = fish_word(row['subject']) if row['cancelled'] else ''
-        if word and word not in words:
-            words.append(word)
+    for row in sorted(rows, key=lambda row: not row['cancelled']):
+        word = fish_word(row['subject'])
+        if word and word not in [w for _, w in words]:
+            words.append((row['cancelled'], word))
     if not words:
         return ''
-    words = words[:3]
-    return 'Non' + words[0] + ''.join(' ' + word for word in words[1:])
+    name = ' '.join(('non' if cancelled else '') + word for cancelled, word in words[:3])
+    return name[0].upper() + name[1:]
 
 
 #
@@ -340,13 +356,13 @@ def render_rows(rows):
         baseline = y + row_height // 2 + font_size // 3
         if i % 2 == 1:
             out.append('<rect x="10" y="%d" width="780" height="%d" fill="#e8e8e8"/>' % (y, row_height))
-        if row['substitution']:
+        if row['substitution'] or row['event']:
             out.append('<rect x="10" y="%d" width="8" height="%d" fill="black"/>' % (y, row_height))
 
         attrs = 'font-size="%d"' % font_size
         if row['cancelled']:
             attrs += ' fill="#777777"'
-        elif row['substitution']:
+        elif row['substitution'] or row['event']:
             attrs += ' font-weight="bold"'
 
         cells = [
@@ -364,15 +380,86 @@ def render_rows(rows):
     return '\n'.join(out)
 
 
+def wrap(text, length):
+    # Split text into lines of at most `length` characters at word boundaries
+    lines = []
+    for word in text.split():
+        if lines and len(lines[-1]) + 1 + len(word) <= length:
+            lines[-1] += ' ' + word
+        else:
+            lines.append(word)
+    return lines
+
+
+def hour_range(numbers):
+    # ['1', '2', ..., '9'] -> "1.–9. Stunde"
+    numbers = sorted({int(n) for n in numbers if str(n).isdigit()})
+    if not numbers:
+        return ''
+    if len(numbers) == 1:
+        return '%d. Stunde' % numbers[0]
+    return '%d.–%d. Stunde' % (numbers[0], numbers[-1])
+
+
+def is_event_day(rows):
+    # All lessons are cancelled and replaced by events (e.g. Wandertag)
+    events = [row for row in rows if row['event']]
+    return bool(events) and all(row['cancelled'] for row in rows if not row['event'])
+
+
+def render_events(rows):
+    events = [row for row in rows if row['event']]
+    texts = []
+    for row in events:
+        if row['subject'] and row['subject'] not in texts:
+            texts.append(row['subject'])
+
+    lines = []
+    for text in texts[:2]:
+        lines.extend(wrap(text, 18))
+    lines = [truncate(line, 18) for line in lines[:3]]
+
+    details = [hour_range(row['number'] for row in events)]
+    rooms = sorted({row['room'] for row in events if row['room']})
+    teachers = sorted({row['teacher'] for row in events if row['teacher']})
+    if rooms:
+        details.append('Raum ' + ', '.join(rooms))
+    if teachers:
+        details.append(', '.join(teachers))
+
+    out = []
+    y = 300 - (len(lines) - 1) * 35
+    for line in lines:
+        out.append('<text x="400" y="%d" font-size="60" font-weight="bold" text-anchor="middle">%s</text>'
+                   % (y, escape(line)))
+        y += 70
+    out.append('<text x="400" y="%d" font-size="28" text-anchor="middle">%s</text>'
+               % (y + 10, escape(truncate(' · '.join(d for d in details if d), 45))))
+    out.append('<text x="400" y="%d" font-size="22" fill="#555555" text-anchor="middle">Der Unterricht entfällt</text>'
+               % (y + 55))
+    return '\n'.join(out)
+
+
 def render_error(message):
     return ('<text x="400" y="300" font-size="36" text-anchor="middle">Stundenplan nicht verfügbar</text>\n'
             '<text x="400" y="350" font-size="20" text-anchor="middle">%s</text>'
             % escape(truncate(message, 70)))
 
 
-def write_svg(title, body, weather_svg, now):
+COLUMN_HEADINGS = '''<g font-size="18" fill="#555555">
+<text x="28" y="105">Std.</text>
+<text x="80" y="105">Zeit</text>
+<text x="200" y="105">Fach</text>
+<text x="530" y="105">Lehrer</text>
+<text x="660" y="105">Raum</text>
+</g>
+<line x1="10" y1="114" x2="790" y2="114" stroke="black" stroke-width="2"/>'''
+
+
+def write_svg(title, body, weather_svg, now, headings=True):
     output = codecs.open(os.path.join(SCRIPT_DIR, 'schedule-script-preprocess.svg'), 'r', encoding='utf-8').read()
     output = output.replace('DATE_TITLE', escape(title))
+    output = output.replace('COLUMN_HEADINGS', COLUMN_HEADINGS if headings else '')
     output = output.replace('UPDATED', now.strftime('%d.%m. %H:%M'))
     output = output.replace('LESSON_ROWS', body)
     output = output.replace('WEATHER', weather_svg)
@@ -390,7 +477,7 @@ def main():
     parser.add_argument('--from-json', help='render from saved API data instead of fetching')
     parser.add_argument('--date', help='day to display (YYYY-MM-DD)')
     parser.add_argument('--no-weather', action='store_true', help='skip the weather forecast')
-    parser.add_argument('--fish-name', action='store_true', help='only print a fish name from the cancelled lessons')
+    parser.add_argument('--fish-name', action='store_true', help='only print a fish name made from the lessons')
     args = parser.parse_args()
 
     config = load_config()
@@ -402,6 +489,7 @@ def main():
     title = '%s, %s' % (DAYS_OF_WEEK[day.weekday()], day.strftime('%d.%m.%Y'))
 
     rows = []
+    headings = True
     try:
         if args.from_json:
             with open(args.from_json, encoding='utf-8') as f:
@@ -413,7 +501,15 @@ def main():
         if args.dump_json:
             print(json.dumps(raw, indent=2, ensure_ascii=False))
         rows = normalize(raw, day)
-        body = render_rows(rows)
+        if not rows and not args.fish_name:
+            # Holidays: no SVG, schedule-script.sh shows a random fish
+            print('Kein Unterricht am %s' % day.isoformat(), file=sys.stderr)
+            sys.exit(EXIT_NO_LESSONS)
+        if is_event_day(rows):
+            body = render_events(rows)
+            headings = False
+        else:
+            body = render_rows(rows)
     except Exception as e:
         print('Fehler: %s' % e, file=sys.stderr)
         body = render_error(str(e))
@@ -431,7 +527,7 @@ def main():
         except Exception as e:
             print('Wetter nicht verfügbar: %s' % e, file=sys.stderr)
 
-    write_svg(title, body, weather_svg, now)
+    write_svg(title, body, weather_svg, now, headings)
 
 
 if __name__ == '__main__':

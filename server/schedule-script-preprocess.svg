@@ -2,6 +2,10 @@
 
 <rect x="0" y="0" width="800" height="600" fill="white"/>
 
+<!-- Margin of about 0.5 cm (33 px at 167 dpi) at the top and left for the passe-partout,
+     the content is scaled down to keep its proportions -->
+<g transform="translate(33 33) scale(0.945)">
+
 <!-- Header -->
 <rect x="0" y="0" width="800" height="70" fill="black"/>
 <text x="20" y="45" font-size="28" font-weight="bold" fill="white">DATE_TITLE</text>
@@ -10,14 +14,7 @@
 WEATHER
 
 <!-- Column headings -->
-<g font-size="18" fill="#555555">
-<text x="28" y="105">Std.</text>
-<text x="80" y="105">Zeit</text>
-<text x="200" y="105">Fach</text>
-<text x="530" y="105">Lehrer</text>
-<text x="660" y="105">Raum</text>
-</g>
-<line x1="10" y1="114" x2="790" y2="114" stroke="black" stroke-width="2"/>
+COLUMN_HEADINGS
 
 <!-- Lessons -->
 <g>
@@ -26,5 +23,7 @@ LESSON_ROWS
 
 <!-- Footer -->
 <text x="790" y="590" font-size="14" fill="#555555" text-anchor="end">Stand: UPDATED</text>
+
+</g>
 
 </svg>

@@ -2,14 +2,16 @@
 
 <rect x="0" y="0" width="800" height="600" fill="white"/>
 
+<!-- Margin of about 0.5 cm (33 px at 167 dpi) at the top and left for the passe-partout,
+     the content is scaled down to keep its proportions -->
+<g transform="translate(33 33) scale(0.945)">
+
 <!-- Header -->
 <rect x="0" y="0" width="800" height="70" fill="black"/>
-<text x="20" y="45" font-size="28" font-weight="bold" fill="white">Montag, 05.10.2026</text>
+<text x="20" y="45" font-size="28" font-weight="bold" fill="white">Donnerstag, 08.10.2026</text>
 
 <!-- Weather -->
-<g transform="translate(462 6) scale(0.58)" fill="white"><path id="ovc" d="m81.245,40.626c-2.34,0-4.558,0.484-6.615,1.264-1.788-11.321-11.508-20.013-23.326-20.013-13.095,0-23.702,10.608-23.702,23.696,0,0.296,0.081,0.571,0.094,0.867-0.296-0.02-0.578-0.087-0.874-0.087-7.045,0-12.759,5.714-12.759,12.759,0,0.087,0.027,0.168,0.027,0.255-1.008-0.302-2.05-0.518-3.153-0.518-6.043,0-10.937,4.901-10.937,10.938,0,6.043,4.894,8.335,10.937,8.335h70.308c10.358,0,18.755-8.389,18.755-18.748s-8.396-18.748-18.755-18.748z"/></g>
-<text x="528" y="32" font-size="22" fill="white">12° / 20°</text>
-<text x="528" y="58" font-size="17" fill="white">Regen 18 %</text>
+
 
 <!-- Column headings -->
 <g font-size="18" fill="#555555">
@@ -23,26 +25,13 @@
 
 <!-- Lessons -->
 <g>
-<text x="28" y="153" font-size="29">1</text>
-<text x="80" y="153" font-size="29">07:45</text>
-<text x="200" y="153" font-size="29">Mathematik</text>
-<text x="530" y="153" font-size="29">Mü</text>
-<text x="660" y="153" font-size="29">204</text>
-<rect x="10" y="168" width="780" height="48" fill="#e8e8e8"/>
-<rect x="10" y="168" width="8" height="48" fill="black"/>
-<text x="28" y="201" font-size="29" font-weight="bold">2</text>
-<text x="80" y="201" font-size="29" font-weight="bold">08:30</text>
-<text x="200" y="201" font-size="29" font-weight="bold">Deutsch</text>
-<text x="530" y="201" font-size="29" font-weight="bold">Sc</text>
-<text x="660" y="201" font-size="29" font-weight="bold">105</text>
-<text x="28" y="249" font-size="29">6</text>
-<text x="80" y="249" font-size="29">12:20</text>
-<text x="200" y="249" font-size="29">Sport</text>
-<text x="530" y="249" font-size="29">Ba</text>
-<text x="660" y="249" font-size="29">TH</text>
+<text x="400" y="300" font-size="36" text-anchor="middle">Stundenplan nicht verfügbar</text>
+<text x="400" y="350" font-size="20" text-anchor="middle">Zugangsdaten fehlen (schedule-config.ini)</text>
 </g>
 
 <!-- Footer -->
-<text x="790" y="590" font-size="14" fill="#555555" text-anchor="end">Stand: 03.10. 21:05</text>
+<text x="790" y="590" font-size="14" fill="#555555" text-anchor="end">Stand: 07.10. 20:49</text>
+
+</g>
 
 </svg>
