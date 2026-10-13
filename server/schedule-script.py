@@ -204,14 +204,8 @@ WMO_ICONS.update({code: 'sn' for code in (71, 73, 75, 77)})
 WMO_ICONS.update({code: 'tsra' for code in (95, 96, 99)})
 
 
-def outdoor_hours(rows):
-    # From one hour before the first until one hour after the last lesson
-    lessons = [row for row in rows if not row['cancelled'] and row['time'] and row['until']]
-    if not lessons:
-        return 7, 17
-    start = min(int(row['time'][:2]) for row in lessons) - 1
-    end = max(int(row['until'][:2]) for row in lessons) + 1
-    return max(start, 0), min(end, 23)
+# Hours for the rain probability: from the way to school until the afternoon
+OUTDOOR_HOURS = (7, 8)
 
 
 def fetch_weather(latitude, longitude, day, hours):
@@ -367,8 +361,7 @@ def render_rows(rows):
 
         cells = [
             (28, str(row['number'])),
-            (80, row['time']),
-            (200, truncate(row['subject'], 20)),
+            (100, truncate(row['subject'], 26)),
             (530, truncate(row['teacher'], 9)),
             (660, truncate(row['room'], 8)),
         ]
@@ -448,8 +441,7 @@ def render_error(message):
 
 COLUMN_HEADINGS = '''<g font-size="18" fill="#555555">
 <text x="28" y="105">Std.</text>
-<text x="80" y="105">Zeit</text>
-<text x="200" y="105">Fach</text>
+<text x="100" y="105">Fach</text>
 <text x="530" y="105">Lehrer</text>
 <text x="660" y="105">Raum</text>
 </g>
@@ -522,7 +514,7 @@ def main():
     weather_svg = ''
     if not args.no_weather:
         try:
-            weather = fetch_weather(config['latitude'], config['longitude'], day, outdoor_hours(rows))
+            weather = fetch_weather(config['latitude'], config['longitude'], day, OUTDOOR_HOURS)
             weather_svg = render_weather(weather, config['rain_threshold'])
         except Exception as e:
             print('Wetter nicht verfügbar: %s' % e, file=sys.stderr)
